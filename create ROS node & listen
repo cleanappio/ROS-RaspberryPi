@@ -1,0 +1,62 @@
+#include <ros/ros.h>
+#include <std_msgs/String.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <move_base_msgs/MoveBaseAction.h>
+
+int main(int argc, char **argv)
+{
+  // Initialize the ROS node
+  ros::init(argc, argv, "litter_picking_node");
+  ros::NodeHandle nh;
+
+  // Create a publisher for sending litter report messages
+  ros::Publisher litter_pub = nh.advertise<std_msgs::String>("litter_report", 1000);
+
+  // Create a subscriber for receiving move base action messages
+  ros::Subscriber move_base_sub = nh.subscribe("move_base", 1000, moveBaseCallback);
+
+  // Create a move base action client
+  actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> move_base_ac("move_base", true);
+
+  // Wait for the move base action server to come online
+  move_base_ac.waitForServer();
+
+  // Prompt the user to enter the litter report
+  std::cout << "Please enter the litter report: ";
+  std::string litter_report;
+  std::getline(std::cin, litter_report);
+
+  // Create a message for the litter report and populate it with the user-generated data
+  std_msgs::String litter_msg;
+  litter_msg.data = litter_report;
+
+  // Publish the litter report message
+  ROS_INFO("Sending litter report: %s", litter_msg.data.c_str());
+  litter_pub.publish(litters_msg);
+
+  // Wait for the robot to reach the litter and pick it up
+  ROS_INFO("Waiting for robot to pick up the litter...");
+  move_base_ac.waitForResult();
+
+  // Check if the robot was successful in picking up the litter
+  if (move_base_ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
+  {
+    ROS_INFO("Robot successfully picked up the litter!");
+  }
+  else
+  {
+    ROS_ERROR("Failed to pick up the litter. The robot is still at its starting position.");
+  }
+
+  return 0;
+}
+
+// Callback function for receiving move base action messages
+void moveBaseCallback(const move_base_msgs::MoveBaseActionFeedback::ConstPtr& feedback)
+{
+  // Extract the pose of the robot from the feedback message
+  const geometry_msgs::PoseStamped robot_pose = feedback->base_position;
+
+  // Print the pose of the robot to the console
+  ROS_INFO("Robot is at position (%.2f, %.2f, %.2f)", robot_pose.pose.position.x, robot_pose.pose.position.y, robot_pose.pose.position.z);
+}
