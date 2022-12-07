@@ -1,0 +1,72 @@
+#include <ros/ros.h>
+#include <std_msgs/String.h>
+#include <robogym/PickUpLitterAction.h>
+#include <actionlib/client/simple_action_client.h>
+
+typedef actionlib::SimpleActionClient<robogym::PickUpLitterAction> PickUpLitterClient;
+
+// Callback function for receiving litter report messages
+void litterReportCallback(const std_msgs::String::ConstPtr& msg)
+{
+  // Print the received litter report to the console
+  ROS_INFO("Received litter report: %s", msg->data.c_str());
+
+  // Create an action client for sending pick up litter goal requests
+  PickUpLitterClient pick_up_litter_ac("pick_up_litter");
+
+  // Wait for the pick up litter action server to come online
+  pick_up_litter_ac.waitForServer();
+
+  // Create a goal for the pick up litter action
+  robogym::PickUpLitterGoal goal;
+  goal.litter_report = msg->data;
+
+  // Send the pick up litter goal request
+  ROS_INFO("Sending pick up litter goal request...");
+  pick_up_litter_ac.sendGoal(goal,
+    boost::bind(&doneCb, _1, _2),
+    boost::bind(&activeCb),
+    boost::bind(&feedbackCb, _1));
+}
+
+int main(int argc, char **argv)
+{
+  // Initialize the ROS node
+  ros::init(argc, argv, "pick_up_litter_node");
+  ros::NodeHandle nh;
+
+  // Create a subscriber for receiving litter report messages
+  ros::Subscriber litter_sub = nh.subscribe("litter_report", 1000, litterReportCallback);
+
+  // Spin the node to listen for incoming messages
+  ROS_INFO("Listening for litter reports...");
+  ros::spin();
+
+  return 0;
+}
+
+// Callback function for when the pick up litter action completes
+void doneCb(const actionlib::SimpleClientGoalState& state,
+            const robogym::PickUpLitterResultConstPtr& result)
+{
+  // Check if the robot was successful in picking up the litter and placing it in the receptacle
+  if (state == actionlib::SimpleClientGoalState::SUCCEEDED)
+  {
+    ROS_INFO("Robot successfully picked up the litter and placed it in the receptacle!");
+  }
+  else
+  {
+    ROS_ERROR("Failed to pick up the litter and place it in the receptacle. The robot is still at its starting position.");
+  }
+}
+
+// Callback function for when the pick up litter action becomes active
+void activeCb()
+{
+  ROS_INFO("Pick up litter action is now active.");
+}
+
+// Callback function for receiving feedback from the pick up litter action
+void feedbackCb(const robogym::PickUpLitterFeedbackConstPtr& feedback)
+{
+  ROS_INFO("Received feedback from pick up litter action: %s", feedback
